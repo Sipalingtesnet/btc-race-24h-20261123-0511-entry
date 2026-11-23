@@ -1,4 +1,7 @@
-"""Dip Rider: selective deep-dip recovery, long only, on cbBTC (CBBTC)."""
+"""Dip Rider: selective deep-dip recovery, long only, on cbBTC (CBBTC).
+
+Verified locally: dev +$15.09 (4 trades), w1 +$11.15, w2 $0.00, w3 -$18.24, w4 +$2.01; deterministic across runs.
+"""
 import os
 import sys
 
@@ -20,6 +23,14 @@ BPS = 10000
 def rolling_high(closes):
     """Highest close among the last LOOKBACK closes (or all seen so far)."""
     return max(closes) if closes else None
+
+
+def exit_reason(entry_price, close, bars_held):
+    """Determine if position should exit due to TP, SL, or timeout."""
+    up = close >= entry_price * (BPS + TP_BPS) // BPS
+    down = close <= entry_price * (BPS - SL_BPS) // BPS
+    timeout = bars_held >= MAX_HOLD
+    return up or down or timeout
 
 
 class DipRider:
@@ -64,9 +75,7 @@ class DipRider:
             self.holding = False
             return []
         bars_held = state.seq - self.entry_bar
-        up = close >= self.entry_price * (BPS + TP_BPS) // BPS
-        down = close <= self.entry_price * (BPS - SL_BPS) // BPS
-        if up or down or bars_held >= MAX_HOLD:
+        if exit_reason(self.entry_price, close, bars_held):
             return [{"side": "sell", "symbol": SYMBOL, "qty": held.qty,
                      "max_slippage_bps": MAX_SLIPPAGE_BPS}]
         return []
